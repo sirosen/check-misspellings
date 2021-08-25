@@ -1,0 +1,8 @@
+- id: check-misspellings
+  name: Check Misspellings
+  description: Check for misspellings based on a corpus of known, often misspelled words
+  entry: check-jsonschema
+  language: python
+  types_or: [python]
+  # we need types_or support
+  minimum_pre_commit_version: 2.9.0
