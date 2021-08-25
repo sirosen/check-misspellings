@@ -7,19 +7,21 @@ import tokenize
 
 from identify import identify
 
-SUBTOKENIZE_SPLIT_REGEX = re.compile(r"\s|\_")
+SUBTOKENIZE_SPLIT_REGEX = re.compile(r"[\s_'\"]")
 DISABLE_COMMENT_REGEX = re.compile(r"\#\s*check\-misspellings\s*:\s*off")
 
 
 def subtokenize_token(token_str):
-    subtokens = SUBTOKENIZE_SPLIT_REGEX.split(token_str)
-    offset = 0
-    for st in subtokens:
-        yield st, offset
-        offset += len(st) + 1
+    for lineno, subtoken_line in enumerate(token_str.split("\n")):
+        subtokens = SUBTOKENIZE_SPLIT_REGEX.split(subtoken_line)
+        offset = 0
+        for st in subtokens:
+            yield st, offset, lineno
+            offset += len(st) + 1
 
 
 def check_python_file(filename, corpus):
+    set_corpus = set(corpus)
     errors = []
     with open(filename, "rb") as fp:
         for token in tokenize.tokenize(fp.readline):
@@ -29,21 +31,32 @@ def check_python_file(filename, corpus):
             if " " in token_str or "_" in token_str:
                 subtokens = list(subtokenize_token(token_str))
             else:
-                subtokens = [(token_str, 0)]
+                subtokens = [(token_str, 0, 0)]
 
-            for subtoken, offset in subtokens:
-                matches = difflib.get_close_matches(subtoken, corpus, n=1, cutoff=0.8)
+            subtokens = [(x.lower(), y, z) for (x, y, z) in subtokens]
+
+            for subtoken, col_offset, line_offset in subtokens:
+                if subtoken in set_corpus:
+                    continue
+                # experimentally found cutoff which matches letter inversions
+                # easily but has minimal incorrect matches
+                matches = difflib.get_close_matches(subtoken, corpus, cutoff=0.825)
                 if matches:
-                    lineno, pos = startpos
-                    errors.append(
-                        (
-                            line.rstrip("\n"),
-                            pos + offset,
-                            lineno,
-                            f"appears similar to {matches}",
-                        )
+                    # exclude substring matches, e.g. 'support' matches
+                    # 'supported', either direction
+                    found_exact = any(
+                        [(subtoken in m or m in subtoken) for m in matches]
                     )
-                    print(token)
+                    if not found_exact:
+                        lineno, pos = startpos
+                        errors.append(
+                            (
+                                line.split("\n")[line_offset],
+                                (pos if line_offset == 0 else 0) + col_offset,
+                                lineno,
+                                f"appears similar to {matches[0]}",
+                            )
+                        )
     return errors
 
 
@@ -108,3 +121,7 @@ def main():
         sys.exit(1)
 
     print("ok -- spellcheck done")
+
+
+if __name__ == "__main__":
+    main()
