@@ -74,6 +74,7 @@ BUILTIN_CORPUS = [
     "dns",
     "fqdn",
     "installable",
+    "routable",
     "deletable",
     "vars",
     "cli",
@@ -116,8 +117,10 @@ BUILTIN_CORPUS = [
     "dereference",
     "dereferenced",
     "dereferences",
-    # known tools, languages, etc
+    "unencrypted",
+    # known tools, languages, filetypes, etc
     "inotify",
+    "plist",
     "cron",
     "uniq",
     "wget",
@@ -129,6 +132,9 @@ BUILTIN_CORPUS = [
     "diff",
     "vi",
     "tr",
+    "init",
+    "ssh",
+    "sshd",
     "git",
     "shellcheck",
     "shfmt",
@@ -164,6 +170,7 @@ BUILTIN_CORPUS = [
     "redoc",
     "rubocop",
     # known service, product, and people names
+    "unix",
     "linux",
     "github",
     "ubuntu",
@@ -294,6 +301,7 @@ def textfile_token_stream(filename):
                 if not enabled:
                     if ENABLE_COMMENT_REGEX.search(line):
                         enabled = True
+                    continue
                 if DISABLE_COMMENT_REGEX.search(line):
                     enabled = False
                     continue
