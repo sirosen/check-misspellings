@@ -1,4 +1,3 @@
-# HTML things
 HTML_TERMS = [
     "alt",
     "div",

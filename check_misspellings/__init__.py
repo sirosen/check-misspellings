@@ -162,7 +162,7 @@ def textfile_token_stream(filename):
     # capture URIs or words (URIs are common in, e.g., bash scripts)
     # important: include `\\` so that we can handle `\n` or `\t`
     word_regex = re.compile(r"(https?\:\/\/\w+\.\w+(\.\w+)*[^\s]*)|[\w\-\\]+")
-    subtokenize_regex = re.compile(r"\\(n|t)")
+    subtokenize_regex = re.compile(r"\\(n|r|t)")
 
     enabled = True
 
@@ -178,12 +178,24 @@ def textfile_token_stream(filename):
                 if DISABLE_COMMENT_REGEX.search(line):
                     enabled = False
                     continue
+
                 token = match.group()
                 offset = 0
                 for st in subtokenize_regex.split(token):
+                    # strip leading and trailing escapes (which were captured
+                    # by the word regex above)
+                    # while so doing, keep the current offset accurate for the
+                    # current word and make sure that the future offset (for
+                    # the next word) will be correct as well
+                    while st.startswith("\\"):
+                        st = st[1:]
+                        offset += 1
+                    add_to_offset = len(st) + 1
+                    while st.endswith("\\"):
+                        st = st[:-1]
                     if not should_skip_token(st):
-                        yield token, line, lineno + 1, match.start() + offset
-                    offset += len(st) + 1
+                        yield st, line, lineno + 1, match.start() + offset
+                    offset += add_to_offset
 
 
 def check_text_file(filename, lengthmap):
