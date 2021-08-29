@@ -18,6 +18,7 @@ LENGTH_BASED_SIMILARITY_CUTOFFS = (
 )
 SUBTOKENIZE_PY_SPLIT_REGEX = re.compile(r"[\s_'\"]")
 SUBTOKENIZE_TEXT_SPLIT_REGEX = re.compile(r"[_\-]")
+CAMEL_AND_TITLE_CASE_ITER_REGEX = re.compile(r"(^|[A-Z])[^A-Z]+")
 NON_WORDSTR_REGEX = re.compile(r"^[^\w]+$")
 DISABLE_COMMENT_REGEX = re.compile(r"check\-misspellings\s*:\s*off")
 ENABLE_COMMENT_REGEX = re.compile(r"check\-misspellings\s*:\s*on")
@@ -167,6 +168,8 @@ def textfile_token_stream(filename):
 
     with open(filename) as f:
         for lineno, line in enumerate(f):
+            # convert to 4-ist spacing for consistent printing later on
+            line = line.replace("\t", "    ")
             for match in word_regex.finditer(line):
                 if not enabled:
                     if ENABLE_COMMENT_REGEX.search(line):
@@ -207,6 +210,15 @@ def token_in_corpus(token, corpus, full_corpus):
             for x in SUBTOKENIZE_TEXT_SPLIT_REGEX.split(token)
         ):
             return True
+    # check camelCase and TitleCase words
+    if all(
+        (
+            _case_insensitive_str_in_corpus(m.group(0), full_corpus)
+            or should_skip_token(m.group(0))
+        )
+        for m in CAMEL_AND_TITLE_CASE_ITER_REGEX.finditer(token)
+    ):
+        return True
     return False
 
 
@@ -236,11 +248,16 @@ def check_tokenstream(tokens, lengthmap):
         matches = difflib.get_close_matches(
             token, current_corpus, cutoff=get_cutoff_for_token(token)
         )
+        # re-check lowercase version of the word when there are no matches
+        if not matches and token != token.lower():
+            matches = difflib.get_close_matches(
+                token.lower(), current_corpus, cutoff=get_cutoff_for_token(token)
+            )
         if matches:
             # exclude substring matches, e.g. 'support' matches 'supported'
             found_exact = any([(token in m or m in token) for m in matches])
             if not found_exact:
-                errors.append((line.rstrip("\n"), pos, lineno, matches))
+                errors.append((token, line.rstrip("\n"), pos, lineno, matches))
                 failed = True
                 if SETTINGS.failfast:
                     return errors
@@ -252,11 +269,11 @@ def check_tokenstream(tokens, lengthmap):
 
 def print_file_errors(filename, errors):
     print("\033[1m" + filename + "\033[0m:")
-    for line, pos, lineno, matches in errors:
+    for token, line, pos, lineno, matches in errors:
         if SETTINGS.show_all_matches:
-            message = f"appears similar to {','.join(matches)}"
+            message = f"'{token}' appears similar to {','.join(matches)}"
         else:
-            message = f"appears similar to {matches[0]}"
+            message = f"'{token}' appears similar to {matches[0]}"
         lineprefix = "line {}: ".format(lineno)
         print(lineprefix + line)
         print(
@@ -274,13 +291,15 @@ def parse_corpus(filenames):
                     continue
                 corpus.add(line)
     if SETTINGS.ascii_ize:
-        for word in corpus:
-            normalized = (
-                unicodedata.normalize("NFKD", line)
+        normalized = set(
+            (
+                unicodedata.normalize("NFKD", word)
                 .encode("ascii", "ignore")
                 .decode("utf-8")
             )
-            corpus.add(normalized)
+            for word in corpus
+        )
+        corpus = corpus | normalized
     return lengthmapped_corpus(corpus)
 
 

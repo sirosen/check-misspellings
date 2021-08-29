@@ -1,30 +1,33 @@
 PYTHON_TERMS = [
+    ".flake8",
+    "flake8",
+    "isort",
+    "pipx",
     "py",
+    "pyflakes",
+    "pylint",
     "python2",
     "python3",
-    "isort",
     "readthedocs",
-    "pylint",
-    "pyflakes",
     "venv",
     "virtualenv",
-    "flake8",
 ]
 
 RUBY_TERMS = [
-    "rb",
-    "rbenv",
+    ".ruby-version",
+    "bundler",
     "erb",
     "nokogiri",
+    "rb",
+    "rbenv",
     "rubocop",
-    "bundler",
 ]
 
 JS_TERMS = [
+    "highlightjs",
     "javascript",
     "js",
     "json",
-    "highlightjs",
 ]
 
 JAVA_TERMS = [
@@ -34,8 +37,8 @@ JAVA_TERMS = [
 # not just markdown itself, but also other markdown languages like ReST and
 # adoc
 MARKDOWN_TERMS = [
-    "asciidoctor",
-    "asciidoc",
     "adoc",
+    "asciidoc",
+    "asciidoctor",
     "markdown",
 ]
