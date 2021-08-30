@@ -2,25 +2,35 @@ from .html_terms import HTML_TERMS
 from .http_terms import HTTP_TERMS
 from .known_env_vars import KNOWN_ENV_VARS
 from .language_terms import (
+    C_TERMS,
     JAVA_TERMS,
     JS_TERMS,
     MARKDOWN_TERMS,
     PYTHON_TERMS,
     RUBY_TERMS,
 )
-from .os_terms import MACOS_TERMS
+from .os_terms import LINUX_TERMS, MACOS_TERMS
 from .proper_nouns import PROPER_NOUNS
 from .scowl_wordlist import SCOWL_CORPUS
 from .software_terms import SOFTWARE_TERMS
 from .unix_terms import UNIX_TERMS
 
+# these additions aren't part of any software-specific set of words
+# they're just common (valid?) usages which don't appear in the SCOWL list
+BASE_CORPUS_ADDITIONS = [
+    "another's",
+]
+
 FULL_CORPUS = (
     SCOWL_CORPUS
+    + BASE_CORPUS_ADDITIONS
     + HTML_TERMS
     + HTTP_TERMS
+    + C_TERMS
     + JAVA_TERMS
     + JS_TERMS
     + KNOWN_ENV_VARS
+    + LINUX_TERMS
     + MACOS_TERMS
     + MARKDOWN_TERMS
     + PROPER_NOUNS

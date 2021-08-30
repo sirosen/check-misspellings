@@ -16,7 +16,7 @@ LENGTH_BASED_SIMILARITY_CUTOFFS = (
     (4, 0.825),
     (10, 0.85),
 )
-SUBTOKENIZE_PY_SPLIT_REGEX = re.compile(r"[\s_'\"]")
+SUBTOKENIZE_PY_SPLIT_REGEX = re.compile(r"\W")
 SUBTOKENIZE_TEXT_SPLIT_REGEX = re.compile(r"[_\-]")
 CAMEL_AND_TITLE_CASE_ITER_REGEX = re.compile(r"(^|[A-Z])[^A-Z]+")
 NON_WORDSTR_REGEX = re.compile(r"^[^\w]+$")
@@ -27,6 +27,15 @@ HAS_URI_SCHEME_REGEX = re.compile(r"^https?\:\/\/")
 IS_DOMAIN_REGEX = re.compile(r"\.(org|net|com|us|co\.uk|io)$")
 TRAILING_DIGIT_REGEX = re.compile(r"\d+$")
 HEX_COLOR_REGEX = re.compile(r"#([0-9a-f]{6}|[0-9a-f]{3})")
+URI_REGEX = re.compile(r"https?\:\/\/\w+\.\w+(\.\w+)*\/[^\s]*")
+TEXT_WORD_REGEX = re.compile(
+    r"""
+    (\#[0-9a-f]{6}(?!\w))   # 6-letter hex colors
+    | (\#[0-9a-f]{3}(?!\w)) # 3-letter hex colors
+    | ([\w\-\\']+)          # normal words
+    """,
+    re.VERBOSE,
+)
 
 
 class _Settings:
@@ -141,17 +150,11 @@ def pyfile_token_stream(filename):
             token_ty, token_str, startpos, endpos, line = token
             if DISABLE_COMMENT_PY_REGEX.search(line):  # skip disabled lines
                 continue
-            if " " in token_str or "_" in token_str:
-                subtokens = list(subtokenize_py_token(token_str))
-            else:
-                subtokens = [(token_str, 0, 0)]
 
-            subtokens = [(x, y, z) for (x, y, z) in subtokens]
-
-            for subtoken, col_offset, line_offset in subtokens:
+            for subtoken, col_offset, line_offset in subtokenize_py_token(token_str):
                 lineno, pos = startpos
                 yield (
-                    token_str,
+                    subtoken,
                     line.split("\n")[line_offset],
                     lineno,
                     (pos if line_offset == 0 else 0) + col_offset,
@@ -162,19 +165,22 @@ def check_python_file(filename, lengthmap):
     return check_tokenstream(pyfile_token_stream(filename), lengthmap)
 
 
+def tokenize_text_line(line):
+    # skip URIs by splitting on them, then word-matching on the remaining parts
+    offset = 0
+    for chunk in URI_REGEX.split(line):
+        if chunk is None:
+            continue
+        if not HAS_URI_SCHEME_REGEX.match(chunk):
+            for match in TEXT_WORD_REGEX.finditer(chunk):
+                yield match.start() + offset, match.group()
+        offset += len(chunk)
+
+
 def textfile_token_stream(filename):
     # capture URIs or words (URIs are common in, e.g., bash scripts)
     # accept hex colors, if only to rule them out
     # important: include `\\` so that we can handle `\n` or `\t`
-    word_regex = re.compile(
-        r"""
-        (https?\:\/\/\w+\.\w+(\.\w+)*[^\s]*)  # allow URIs
-        | (\#[0-9a-f]{6}(?!\w))  # 6-letter hex colors
-        | (\#[0-9a-f]{3}(?!\w))  # 3-letter hex colors
-        | ([\w\-\\']+)            # normal words
-        """,
-        re.VERBOSE,
-    )
     subtokenize_regex = re.compile(r"\\(n|r|t)")
 
     enabled = True
@@ -191,8 +197,7 @@ def textfile_token_stream(filename):
 
             # convert to 4-ist spacing for consistent printing later on
             line = line.replace("\t", "    ")
-            for match in word_regex.finditer(line):
-                token = match.group()
+            for start_pos, token in tokenize_text_line(line):
                 if should_skip_token(token):
                     continue
 
@@ -212,7 +217,7 @@ def textfile_token_stream(filename):
                     while st.endswith("\\") or st.endswith("'"):
                         st = st[:-1]
                     if not should_skip_token(st):
-                        yield st, line, lineno + 1, match.start() + offset
+                        yield st, line, lineno + 1, start_pos + offset
                     offset += add_to_offset
 
 
@@ -220,8 +225,15 @@ def check_text_file(filename, lengthmap):
     return check_tokenstream(textfile_token_stream(filename), lengthmap)
 
 
+def _title(s):
+    # don't use '.title()' because on "foo's" it produces "Foo'S"
+    if not s:
+        return s
+    return s[0].upper() + s[1:]
+
+
 def _case_insensitive_str_in_corpus(s, corpus):
-    return s in corpus or s.lower() in corpus or s.title() in corpus
+    return s in corpus or s.lower() in corpus or _title(s) in corpus
 
 
 def token_in_corpus(token, corpus, full_corpus):
