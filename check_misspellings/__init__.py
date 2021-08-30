@@ -1,15 +1,17 @@
-#!/usr/bin/env python
 import argparse
 import difflib
 import re
 import sys
-import tokenize
 import unicodedata
-import uuid
 
 from identify import identify
 
 from .builtin_corpus import FULL_CORPUS
+from .tokenizers import (
+    SUBTOKENIZE_TEXT_SPLIT_REGEX,
+    TOKENIZER_MAPPING,
+    should_skip_token,
+)
 
 # experimentally found cutoffs which match letter inversions
 # easily but have minimal incorrect matches
@@ -17,32 +19,11 @@ LENGTH_BASED_SIMILARITY_CUTOFFS = (
     (4, 0.825),
     (10, 0.85),
 )
-SUBTOKENIZE_PY_SPLIT_REGEX = re.compile(r"[^\w'\"]")
-SUBTOKENIZE_TEXT_SPLIT_REGEX = re.compile(r"[_\-]")
 CAMEL_AND_TITLE_CASE_ITER_REGEX = re.compile(r"(^|[A-Z])[^A-Z]+")
-NON_WORDSTR_REGEX = re.compile(r"^[^\w]+$")
-DISABLE_COMMENT_REGEX = re.compile(r"check\-misspellings\s*:\s*off")
-ENABLE_COMMENT_REGEX = re.compile(r"check\-misspellings\s*:\s*on")
-DISABLE_COMMENT_PY_REGEX = re.compile(r"#\s*check\-misspellings\s*:\s*off")
-HAS_URI_SCHEME_REGEX = re.compile(r"^https?\:\/\/")
-IS_DOMAIN_REGEX = re.compile(r"\.(org|net|com|us|co\.uk|io)$")
 TRAILING_DIGIT_REGEX = re.compile(r"\d+$")
-HEX_COLOR_REGEX = re.compile(r"#([0-9a-f]{6}|[0-9a-f]{3})")
-URI_REGEX = re.compile(r"https?\:\/\/\w+\.\w+(\.\w+)*\/[^\s]*")
-TEXT_WORD_REGEX = re.compile(
-    r"""
-    (\#[0-9a-f]{6}(?!\w))   # 6-letter hex colors
-    | (\#[0-9a-f]{3}(?!\w)) # 3-letter hex colors
-    | ([\w\-\\']+)          # normal words
-    """,
-    re.VERBOSE,
-)
-PYTHON_LETTER_QUOTE_PREFIXES = [
-    f"{x}{y}" for x in ["r", "u", "b", "f"] for y in ["'", '"']
-]
 
 
-class _Settings:
+class _Context:
     def __init__(self):
         self.min_word_length = 4
         self.ascii_ize = True
@@ -66,7 +47,7 @@ class _Settings:
         self.show_all_matches = args.show_all_matches
 
 
-SETTINGS = _Settings()
+CONTEXT = _Context()
 
 
 _SAVED_CORPUS_SLICES = {}
@@ -105,36 +86,6 @@ def corpus_for_token(token, lengthmap):
     return lengthmap[0]
 
 
-def should_skip_token(tok):
-    if tok == "":
-        return True
-    if len(tok) < SETTINGS.min_word_length:
-        return True
-
-    # skip any values which match these non-text types
-    try:
-        float(tok)
-        return True
-    except ValueError:
-        pass
-    try:
-        uuid.UUID(tok)
-        return True
-    except ValueError:
-        pass
-
-    if HEX_COLOR_REGEX.fullmatch(tok):
-        return True
-    if HAS_URI_SCHEME_REGEX.match(tok):
-        return True
-    if IS_DOMAIN_REGEX.match(tok):
-        return True
-    if NON_WORDSTR_REGEX.match(tok):
-        return True
-
-    return False
-
-
 def should_skip_file(filename, tags):
     if "symlink" in tags:
         return True
@@ -143,112 +94,6 @@ def should_skip_file(filename, tags):
     if "directory" in tags:
         return True
     return False
-
-
-def subtokenize_py_token(token_str):
-    if should_skip_token(token_str):
-        return
-
-    for lineno, subtoken_line in enumerate(token_str.split("\n")):
-        subtokens = SUBTOKENIZE_PY_SPLIT_REGEX.split(subtoken_line)
-        offset = 0
-        for st in subtokens:
-            add_offset = len(st) + 1
-
-            # trim trailing and leading quotes, including 'r"', 'u"', etc
-            while any(st.startswith(x) for x in PYTHON_LETTER_QUOTE_PREFIXES):
-                st = st[2:]
-                offset += 2
-            while st.startswith('"') or st.startswith("'"):
-                st = st[1:]
-                offset += 1
-            while st.endswith('"') or st.endswith("'"):
-                st = st[:-1]
-
-            if not should_skip_token(st):
-                yield st, offset, lineno
-            offset += add_offset
-
-
-def pyfile_token_stream(filename):
-    with open(filename, "rb") as fp:
-        for token in tokenize.tokenize(fp.readline):
-            token_ty, token_str, startpos, endpos, line = token
-            if DISABLE_COMMENT_PY_REGEX.search(line):  # skip disabled lines
-                continue
-
-            for subtoken, col_offset, line_offset in subtokenize_py_token(token_str):
-                lineno, pos = startpos
-                yield (
-                    subtoken,
-                    line.split("\n")[line_offset],
-                    lineno,
-                    (pos if line_offset == 0 else 0) + col_offset,
-                )
-
-
-def check_python_file(filename, lengthmap):
-    return check_tokenstream(filename, pyfile_token_stream(filename), lengthmap)
-
-
-def tokenize_text_line(line):
-    # skip URIs by splitting on them, then word-matching on the remaining parts
-    offset = 0
-    for chunk in URI_REGEX.split(line):
-        if chunk is None:
-            continue
-        if not HAS_URI_SCHEME_REGEX.match(chunk):
-            for match in TEXT_WORD_REGEX.finditer(chunk):
-                yield match.start() + offset, match.group()
-        offset += len(chunk)
-
-
-def textfile_token_stream(filename):
-    # capture URIs or words (URIs are common in, e.g., bash scripts)
-    # accept hex colors, if only to rule them out
-    # important: include `\\` so that we can handle `\n` or `\t`
-    subtokenize_regex = re.compile(r"\\(n|r|t)")
-
-    enabled = True
-
-    with open(filename) as f:
-        for lineno, line in enumerate(f):
-            if not enabled:
-                if ENABLE_COMMENT_REGEX.search(line):
-                    enabled = True
-                continue
-            if DISABLE_COMMENT_REGEX.search(line):
-                enabled = False
-                continue
-
-            # convert to 4-ist spacing for consistent printing later on
-            line = line.replace("\t", "    ")
-            for start_pos, token in tokenize_text_line(line):
-                if should_skip_token(token):
-                    continue
-
-                offset = 0
-                for st in subtokenize_regex.split(token):
-                    # strip leading and trailing escapes (which were captured
-                    # by the word regex above) or leading and trailing
-                    # quotation marks
-                    #
-                    # while so doing, keep the current offset accurate for the
-                    # current word and make sure that the future offset (for
-                    # the next word) will be correct as well
-                    while st.startswith("\\") or st.startswith("'"):
-                        st = st[1:]
-                        offset += 1
-                    add_to_offset = len(st) + 1
-                    while st.endswith("\\") or st.endswith("'"):
-                        st = st[:-1]
-                    if not should_skip_token(st):
-                        yield st, line, lineno + 1, start_pos + offset
-                    offset += add_to_offset
-
-
-def check_text_file(filename, lengthmap):
-    return check_tokenstream(filename, textfile_token_stream(filename), lengthmap)
 
 
 def _title(s):
@@ -282,7 +127,10 @@ def token_in_corpus(token, corpus, full_corpus):
         ):
             return True
         if all(
-            (_case_insensitive_str_in_corpus(x, full_corpus) or should_skip_token(x))
+            (
+                _case_insensitive_str_in_corpus(x, full_corpus)
+                or should_skip_token(x, CONTEXT)
+            )
             for x in SUBTOKENIZE_TEXT_SPLIT_REGEX.split(token)
         ):
             return True
@@ -290,7 +138,7 @@ def token_in_corpus(token, corpus, full_corpus):
     if all(
         (
             _case_insensitive_str_in_corpus(m.group(0), full_corpus)
-            or should_skip_token(m.group(0))
+            or should_skip_token(m.group(0), CONTEXT)
         )
         for m in CAMEL_AND_TITLE_CASE_ITER_REGEX.finditer(token)
     ):
@@ -313,23 +161,23 @@ def get_cutoff_for_token(tok):
     return last
 
 
-def check_tokenstream(filename, tokens, lengthmap):
+def check_tokenstream(filename, tokenizer, context, lengthmap):
     full_corpus = lengthmap[0]
-    for token, line, lineno, pos in tokens:
+    for token, line, lineno, pos in tokenizer(filename, context):
         location_item = (token, line.rstrip("\n"), pos, lineno)
 
         current_corpus = corpus_for_token(token, lengthmap)
         if token_in_corpus(token, current_corpus, full_corpus):
             continue
-        if token in SETTINGS.non_error_non_corpus_words:
+        if token in context.non_error_non_corpus_words:
             continue
-        if token in SETTINGS.found_error_matches:
-            if filename not in SETTINGS.found_error_locations:
-                SETTINGS.found_error_locations[filename] = []
-            SETTINGS.found_error_locations[filename].append(location_item)
+        if token in context.found_error_matches:
+            if filename not in context.found_error_locations:
+                context.found_error_locations[filename] = []
+            context.found_error_locations[filename].append(location_item)
             continue
 
-        if SETTINGS.show_not_in_corpus:
+        if context.show_not_in_corpus:
             print(f"non-corpus word: {token}")
 
         failed = False
@@ -342,22 +190,22 @@ def check_tokenstream(filename, tokens, lengthmap):
                 token.lower(), current_corpus, cutoff=get_cutoff_for_token(token)
             )
         if matches:
-            SETTINGS.found_error_matches[token] = matches
-            SETTINGS.found_error_locations[filename] = [location_item]
+            context.found_error_matches[token] = matches
+            context.found_error_locations[filename] = [location_item]
             failed = True
-            if SETTINGS.failfast:
+            if context.failfast:
                 return
 
         if not failed:
-            SETTINGS.non_error_non_corpus_words.add(token)
+            context.non_error_non_corpus_words.add(token)
     return
 
 
 def print_file_errors(filename, errors):
     print("\033[1m" + filename + "\033[0m:")
     for token, line, pos, lineno in errors:
-        matches = SETTINGS.found_error_matches[token]
-        if SETTINGS.show_all_matches:
+        matches = CONTEXT.found_error_matches[token]
+        if CONTEXT.show_all_matches:
             message = f"'{token}' appears similar to {','.join(matches)}"
         else:
             message = f"'{token}' appears similar to {matches[0]}"
@@ -377,7 +225,7 @@ def parse_corpus(filenames):
                 if line.startswith("#") or line == "":
                     continue
                 corpus.add(line)
-    if SETTINGS.ascii_ize:
+    if CONTEXT.ascii_ize:
         normalized = set(
             (
                 unicodedata.normalize("NFKD", word)
@@ -432,36 +280,36 @@ def main():
     parser.add_argument("--exclude", action="append", help="Files to skip", default=[])
     parser.add_argument("files", nargs="+", help="Files to check.")
     args = parser.parse_args()
-    SETTINGS.set_args(args)
+    CONTEXT.set_args(args)
 
     lengthmap = parse_corpus(args.corpus)
 
     for filename in args.files:
         if filename in args.exclude:
             continue
-        if SETTINGS.verbose:
+        if CONTEXT.verbose:
             print(f"check: {filename}")
         tags = identify.tags_from_path(filename)
         if should_skip_file(filename, tags):
             continue
 
-        if "python" in tags:
-            checker = check_python_file
-        elif "text" in tags:
-            checker = check_text_file
-        else:
+        tokenizer = None
+        for tok_tag, tag_tokenizer in TOKENIZER_MAPPING:
+            if tok_tag in tags:
+                tokenizer = tag_tokenizer
+        if not tokenizer:
             print(f"WARNING: cannot check {filename} as it is not a supported filetype")
             continue
 
-        checker(filename, lengthmap)
-        if SETTINGS.found_error_matches:
-            if SETTINGS.failfast:
+        check_tokenstream(filename, tokenizer, CONTEXT, lengthmap)
+        if CONTEXT.found_error_matches:
+            if CONTEXT.failfast:
                 break
-    if SETTINGS.found_error_matches:
+    if CONTEXT.found_error_matches:
         print("Spelling errors were encountered.")
         for filename in args.files:
-            if filename in SETTINGS.found_error_locations:
-                print_file_errors(filename, SETTINGS.found_error_locations[filename])
+            if filename in CONTEXT.found_error_locations:
+                print_file_errors(filename, CONTEXT.found_error_locations[filename])
         sys.exit(1)
 
     print("ok -- spellcheck done")
