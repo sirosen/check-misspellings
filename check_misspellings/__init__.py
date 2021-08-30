@@ -25,6 +25,8 @@ ENABLE_COMMENT_REGEX = re.compile(r"check\-misspellings\s*:\s*on")
 DISABLE_COMMENT_PY_REGEX = re.compile(r"#\s*check\-misspellings\s*:\s*off")
 HAS_URI_SCHEME_REGEX = re.compile(r"^https?\:\/\/")
 IS_DOMAIN_REGEX = re.compile(r"\.(org|net|com|us|co\.uk|io)$")
+TRAILING_DIGIT_REGEX = re.compile(r"\d+$")
+HEX_COLOR_REGEX = re.compile(r"#([0-9a-f]{6}|[0-9a-f]{3})")
 
 
 class _Settings:
@@ -91,6 +93,8 @@ def should_skip_token(tok):
     if tok == "":
         return True
     if len(tok) < SETTINGS.min_word_length:
+        return True
+    if HEX_COLOR_REGEX.fullmatch(tok):
         return True
     if HAS_URI_SCHEME_REGEX.match(tok):
         return True
@@ -160,38 +164,52 @@ def check_python_file(filename, lengthmap):
 
 def textfile_token_stream(filename):
     # capture URIs or words (URIs are common in, e.g., bash scripts)
+    # accept hex colors, if only to rule them out
     # important: include `\\` so that we can handle `\n` or `\t`
-    word_regex = re.compile(r"(https?\:\/\/\w+\.\w+(\.\w+)*[^\s]*)|[\w\-\\]+")
+    word_regex = re.compile(
+        r"""
+        (https?\:\/\/\w+\.\w+(\.\w+)*[^\s]*)  # allow URIs
+        | (\#[0-9a-f]{6}(?!\w))  # 6-letter hex colors
+        | (\#[0-9a-f]{3}(?!\w))  # 3-letter hex colors
+        | ([\w\-\\']+)            # normal words
+        """,
+        re.VERBOSE,
+    )
     subtokenize_regex = re.compile(r"\\(n|r|t)")
 
     enabled = True
 
     with open(filename) as f:
         for lineno, line in enumerate(f):
+            if not enabled:
+                if ENABLE_COMMENT_REGEX.search(line):
+                    enabled = True
+                continue
+            if DISABLE_COMMENT_REGEX.search(line):
+                enabled = False
+                continue
+
             # convert to 4-ist spacing for consistent printing later on
             line = line.replace("\t", "    ")
             for match in word_regex.finditer(line):
-                if not enabled:
-                    if ENABLE_COMMENT_REGEX.search(line):
-                        enabled = True
-                    continue
-                if DISABLE_COMMENT_REGEX.search(line):
-                    enabled = False
+                token = match.group()
+                if should_skip_token(token):
                     continue
 
-                token = match.group()
                 offset = 0
                 for st in subtokenize_regex.split(token):
                     # strip leading and trailing escapes (which were captured
-                    # by the word regex above)
+                    # by the word regex above) or leading and trailing
+                    # quotation marks
+                    #
                     # while so doing, keep the current offset accurate for the
                     # current word and make sure that the future offset (for
                     # the next word) will be correct as well
-                    while st.startswith("\\"):
+                    while st.startswith("\\") or st.startswith("'"):
                         st = st[1:]
                         offset += 1
                     add_to_offset = len(st) + 1
-                    while st.endswith("\\"):
+                    while st.endswith("\\") or st.endswith("'"):
                         st = st[:-1]
                     if not should_skip_token(st):
                         yield st, line, lineno + 1, match.start() + offset
@@ -209,6 +227,14 @@ def _case_insensitive_str_in_corpus(s, corpus):
 def token_in_corpus(token, corpus, full_corpus):
     if _case_insensitive_str_in_corpus(token, corpus):
         return True
+
+    # check for "myfoo" where "foo" is in the corpus, as this is a
+    # common/classic way of writing examples
+    if token.lower().startswith("my") and _case_insensitive_str_in_corpus(
+        token[2:], full_corpus
+    ):
+        return True
+
     # allow loose hyphenate and '_'-separation handling
     # "one-time" matches "onetime"
     # "single-use" matches "single", "use"
@@ -231,6 +257,12 @@ def token_in_corpus(token, corpus, full_corpus):
         for m in CAMEL_AND_TITLE_CASE_ITER_REGEX.finditer(token)
     ):
         return True
+    # check to see if the token is in the corpus when trailing digits are
+    # removed, e.g. 'project1, project2' match 'project'
+    trailing_digits = TRAILING_DIGIT_REGEX.search(token)
+    if trailing_digits:
+        if _case_insensitive_str_in_corpus(token[: trailing_digits.start()], corpus):
+            return True
     return False
 
 
@@ -266,13 +298,10 @@ def check_tokenstream(tokens, lengthmap):
                 token.lower(), current_corpus, cutoff=get_cutoff_for_token(token)
             )
         if matches:
-            # exclude substring matches, e.g. 'support' matches 'supported'
-            found_exact = any([(token in m or m in token) for m in matches])
-            if not found_exact:
-                errors.append((token, line.rstrip("\n"), pos, lineno, matches))
-                failed = True
-                if SETTINGS.failfast:
-                    return errors
+            errors.append((token, line.rstrip("\n"), pos, lineno, matches))
+            failed = True
+            if SETTINGS.failfast:
+                return errors
 
         if not failed:
             SETTINGS.non_error_non_corpus_words.add(token)

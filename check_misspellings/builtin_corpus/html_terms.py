@@ -14,4 +14,6 @@ HTML_TERMS = [
     "tfoot",
     "thead",
     "tr",
+    "xhtml",
+    "xml",
 ]
