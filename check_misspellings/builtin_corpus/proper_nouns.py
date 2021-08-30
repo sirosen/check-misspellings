@@ -1,13 +1,27 @@
 # known service, font, product, and people names
 PROPER_NOUNS = [
+    "Consolas",
+    "Encrypt's",  # from "Let's Encrypt's"
     "Erdos",
     "S3",
+    "S3's",
     "amazonaws",
     "awscli",
-    "Consolas",
+    "certbot",
+    "Firefox",
     "github",
     "gmail",
+    "gunicorn",
     "httpie",
+    "Iceweasel",
+    "kerberos",
+    "ldap",
     "memcache",
     "memcached",
+    "nanoc",
+    "openapi",
+    "openapi2",
+    "openapi3",
+    "sqlite",
+    "sqlite3",
 ]
