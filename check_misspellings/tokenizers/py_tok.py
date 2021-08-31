@@ -14,6 +14,8 @@ PYTHON_LETTER_QUOTE_PREFIXES = [
 def subtokenize_py_token(token_str, context):
     if should_skip_token(token_str, context):
         return
+    if should_skip_token(token_str.strip("'\""), context):
+        return
 
     for lineno, subtoken_line in enumerate(token_str.split("\n")):
         subtokens = SUBTOKENIZE_PY_SPLIT_REGEX.split(subtoken_line)

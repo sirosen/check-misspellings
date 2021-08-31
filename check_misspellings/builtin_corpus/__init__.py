@@ -17,6 +17,7 @@ from .web_terms import HTML_TERMS, HTTP_TERMS, SSL_TERMS
 # they're just common (valid?) usages which don't appear in the SCOWL list
 BASE_CORPUS_ADDITIONS = [
     "another's",
+    "unintuitively",
 ]
 
 FULL_CORPUS = (

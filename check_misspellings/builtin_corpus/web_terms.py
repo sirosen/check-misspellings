@@ -1,6 +1,7 @@
 HTML_TERMS = [
     "alt",
     "div",
+    "divs",
     "hr",
     "href",
     "html",

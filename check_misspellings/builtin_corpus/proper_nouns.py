@@ -1,16 +1,22 @@
 # known service, font, product, and people names
 PROPER_NOUNS = [
+    ".gitignore",
     "Consolas",
+    "editorconfig",
+    ".editorconfig",
     "Encrypt's",  # from "Let's Encrypt's"
     "Erdos",
-    "S3",
+    "3",
     "S3's",
     "amazonaws",
     "awscli",
     "certbot",
     "Firefox",
+    "git",
+    "gitignore",
     "github",
     "gmail",
+    "gsuite",
     "gunicorn",
     "httpie",
     "Iceweasel",

@@ -111,11 +111,19 @@ def token_in_corpus(token, corpus, full_corpus):
     if _case_insensitive_str_in_corpus(token, corpus):
         return True
 
+    if _case_insensitive_str_in_corpus(token.replace("\\", ""), corpus):
+        return True
+
     # check for "myfoo" where "foo" is in the corpus, as this is a
     # common/classic way of writing examples
+    # likewise, check for "newfoo", "oldfoo"
     if token.lower().startswith("my") and _case_insensitive_str_in_corpus(
         token[2:], full_corpus
     ):
+        return True
+    if (
+        token.lower().startswith("new") or token.lower().startswith("old")
+    ) and _case_insensitive_str_in_corpus(token[3:], full_corpus):
         return True
 
     # allow loose hyphenate and '_'-separation handling
@@ -297,6 +305,7 @@ def main():
         for tok_tag, tag_tokenizer in TOKENIZER_MAPPING:
             if tok_tag in tags:
                 tokenizer = tag_tokenizer
+                break
         if not tokenizer:
             print(f"WARNING: cannot check {filename} as it is not a supported filetype")
             continue

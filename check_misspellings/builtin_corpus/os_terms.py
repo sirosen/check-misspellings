@@ -31,6 +31,7 @@ LINUX_TERMS = [
 # and standard or commonly found tools (e.g. posix core)
 UNIX_TERMS = [
     ".bashrc",
+    "atime",
     "basename",
     "bashrc",
     "cacert",
@@ -40,6 +41,7 @@ UNIX_TERMS = [
     "chown",
     "cmake",
     "cron",
+    "ctime",
     "diff",
     "dir",
     "dirname",
@@ -66,6 +68,7 @@ UNIX_TERMS = [
     "lstat",
     "manpage",
     "mkdir",
+    "mtime",
     "mv",
     "ncat",
     "nslookup",
@@ -103,6 +106,7 @@ UNIX_TERMS = [
     "uname",
     "uniq",
     "unix",
+    "urandom",
     "usr",
     "vi",
     "wget",
