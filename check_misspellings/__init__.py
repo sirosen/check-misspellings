@@ -198,8 +198,10 @@ def check_tokenstream(filename, tokenizer, context, lengthmap):
                 token.lower(), current_corpus, cutoff=get_cutoff_for_token(token)
             )
         if matches:
+            if filename not in context.found_error_locations:
+                context.found_error_locations[filename] = []
             context.found_error_matches[token] = matches
-            context.found_error_locations[filename] = [location_item]
+            context.found_error_locations[filename].append(location_item)
             failed = True
             if context.failfast:
                 return
