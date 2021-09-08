@@ -1,12 +1,14 @@
 import re
 import uuid
+_URI_RE_S = r"https?\:\/\/\w+\.\w+(\.\w+)*\/[^\s]*"
 
 HAS_URI_SCHEME_REGEX = re.compile(r"^https?\:\/\/")
 HEX_COLOR_REGEX = re.compile(r"#([0-9a-f]{6}|[0-9a-f]{3})")
 IS_DOMAIN_REGEX = re.compile(r"\.(org|net|com|us|co\.uk|io)$")
 NON_WORDSTR_REGEX = re.compile(r"^[^\w]+$")
 SUBTOKENIZE_TEXT_SPLIT_REGEX = re.compile(r"[_\-]")
-URI_REGEX = re.compile(r"https?\:\/\/\w+\.\w+(\.\w+)*\/[^\s]*")
+URI_REGEX = re.compile(_URI_RE_S)
+CAPTURING_URI_REGEX = re.compile("(" + _URI_RE_S + ")")
 DISABLE_COMMENT_REGEX = re.compile(r"check\-misspellings\s*:\s*off")
 ENABLE_COMMENT_REGEX = re.compile(r"check\-misspellings\s*:\s*on")
 

@@ -9,6 +9,7 @@ SOFTWARE_TERMS = [
     "admin",
     "admin's",
     "admins",
+    "alphanumerics",
     "alt",
     "analytics",
     "anonymize",

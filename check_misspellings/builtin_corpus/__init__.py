@@ -6,6 +6,7 @@ from .language_terms import (
     JS_TERMS,
     MARKDOWN_TERMS,
     RUBY_TERMS,
+    SQL_TERMS,
 )
 from .os_terms import LINUX_TERMS, MACOS_TERMS, UNIX_TERMS
 from .proper_nouns import PROPER_NOUNS
@@ -38,6 +39,7 @@ FULL_CORPUS = (
     + PYTHON_TERMS
     + RUBY_TERMS
     + BASH_TERMS
+    + SQL_TERMS
     + SOFTWARE_TERMS
     + UNIX_TERMS
 )

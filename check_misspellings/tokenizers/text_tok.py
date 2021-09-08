@@ -1,10 +1,10 @@
 import re
 
 from .common import (
+    CAPTURING_URI_REGEX,
     DISABLE_COMMENT_REGEX,
     ENABLE_COMMENT_REGEX,
     HAS_URI_SCHEME_REGEX,
-    URI_REGEX,
     should_skip_token,
 )
 
@@ -21,7 +21,7 @@ TEXT_WORD_REGEX = re.compile(
 def tokenize_text_line(line):
     # skip URIs by splitting on them, then word-matching on the remaining parts
     offset = 0
-    for chunk in URI_REGEX.split(line):
+    for chunk in CAPTURING_URI_REGEX.split(line):
         if chunk is None:
             continue
         if not HAS_URI_SCHEME_REGEX.match(chunk):
