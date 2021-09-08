@@ -4,8 +4,12 @@ MACOS_TERMS = [
 ]
 
 LINUX_TERMS = [
+    "distro",
+    "distro's",
+    "distros",
     "fcontext",
     "linux",
+    "linuxes",
     "selinux",
     "semanage",
     "sestatus",
@@ -79,9 +83,11 @@ UNIX_TERMS = [
     "pipefail",
     "popen",
     "posix",
+    "readlink",
     "recv",
     "rm",
     "rmdir",
+    "rsync",
     "sbin",
     "setgid",
     "setuid",
@@ -106,9 +112,11 @@ UNIX_TERMS = [
     "uname",
     "uniq",
     "unix",
+    "uptime",
     "urandom",
     "usr",
     "vi",
     "wget",
     "whoami",
+    "xterm",
 ]

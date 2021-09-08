@@ -1,4 +1,3 @@
-# known service, font, product, and people names
 PROPER_NOUNS = [
     ".gitignore",
     "Consolas",
@@ -6,7 +5,7 @@ PROPER_NOUNS = [
     ".editorconfig",
     "Encrypt's",  # from "Let's Encrypt's"
     "Erdos",
-    "3",
+    "S3",
     "S3's",
     "amazonaws",
     "awscli",
@@ -20,7 +19,10 @@ PROPER_NOUNS = [
     "gunicorn",
     "httpie",
     "Iceweasel",
+    "IEEE",
+    "IETF",
     "kerberos",
+    "kinesis",
     "ldap",
     "memcache",
     "memcached",
@@ -28,6 +30,5 @@ PROPER_NOUNS = [
     "openapi",
     "openapi2",
     "openapi3",
-    "sqlite",
-    "sqlite3",
+    "uwsgi",
 ]

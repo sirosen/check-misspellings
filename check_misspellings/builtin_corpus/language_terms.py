@@ -1,68 +1,4 @@
-# including terms from python tools like tox, pytest, sphinx
-# as well as stdlib functions of note (e.g. os.makedirs)
-PYTHON_TERMS = [
-    "addopts",
-    "asyncio",
-    "autoclass",
-    "autodata",
-    "autofunction",
-    "automodule",
-    "autouse",
-    "bysource",
-    "changedir",
-    "customizable",
-    "deps",
-    "dict",
-    "dicts",
-    "distutils",
-    "dunder",
-    "elif",
-    "envlist",
-    "excinfo",
-    "expanduser",
-    ".flake8",
-    "flake8",
-    "furo",
-    "isinstance",
-    "isort",
-    "issubclass",
-    "iter",
-    "makedirs",
-    "pipx",
-    "pprint",
-    "pragma",
-    "py",
-    "pyflakes",
-    "pygments",
-    "pyinstaller",
-    "pylint",
-    "pypa",
-    "pypi",
-    "pytest",
-    "python2",
-    "python3",
-    "pythonic",
-    "pyupgrade",
-    "readthedocs",
-    "repr",
-    "reraise",
-    "rstrip",
-    "rtype",
-    "sdist",
-    "seealso",
-    "str",
-    "strs",
-    "unittest",
-    "unpickle",
-    "unpickled",
-    "unpickles",
-    "vartype",
-    "venv",
-    "versionadded",
-    "virtualenv",
-    "xdist",
-    "xfail",
-]
+# for non-python languages
 
 RUBY_TERMS = [
     ".ruby-version",
@@ -83,6 +19,7 @@ JS_TERMS = [
 
 JAVA_TERMS = [
     "java",
+    "javac",
 ]
 
 # not just markdown itself, but also other markdown languages like ReST and
@@ -96,4 +33,20 @@ MARKDOWN_TERMS = [
 
 C_TERMS = [
     "-Werror",
+]
+
+BASH_TERMS = [
+    "esac",
+    "popd",
+    "pushd",
+]
+
+SQL_TERMS = [
+    "createdb",
+    "mysql",
+    "postgres",
+    "postgresql",
+    "psql",
+    "sqlite",
+    "sqlite3",
 ]

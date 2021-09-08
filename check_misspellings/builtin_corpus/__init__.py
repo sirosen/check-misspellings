@@ -1,14 +1,15 @@
 from .known_env_vars import KNOWN_ENV_VARS
 from .language_terms import (
+    BASH_TERMS,
     C_TERMS,
     JAVA_TERMS,
     JS_TERMS,
     MARKDOWN_TERMS,
-    PYTHON_TERMS,
     RUBY_TERMS,
 )
 from .os_terms import LINUX_TERMS, MACOS_TERMS, UNIX_TERMS
 from .proper_nouns import PROPER_NOUNS
+from .python_terms import PYTHON_TERMS
 from .scowl_wordlist import SCOWL_CORPUS
 from .software_terms import SOFTWARE_TERMS
 from .web_terms import HTML_TERMS, HTTP_TERMS, SSL_TERMS
@@ -36,6 +37,7 @@ FULL_CORPUS = (
     + PROPER_NOUNS
     + PYTHON_TERMS
     + RUBY_TERMS
+    + BASH_TERMS
     + SOFTWARE_TERMS
     + UNIX_TERMS
 )

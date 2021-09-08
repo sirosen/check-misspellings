@@ -52,6 +52,6 @@ def pyfile_token_stream(filename, context):
                 yield (
                     subtoken,
                     line.split("\n")[line_offset],
-                    lineno,
+                    lineno + line_offset,
                     (pos if line_offset == 0 else 0) + col_offset,
                 )

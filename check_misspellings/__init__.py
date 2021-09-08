@@ -32,8 +32,9 @@ class _Context:
         self.show_not_in_corpus = False
         self.show_all_matches = False
 
-        # shared cache
+        # shared caches
         self.non_error_non_corpus_words = set()
+        self.cached_matches_in_corpus = set()
         # keyed by word
         self.found_error_locations = {}
         self.found_error_matches = {}
@@ -108,6 +109,8 @@ def _case_insensitive_str_in_corpus(s, corpus):
 
 
 def token_in_corpus(token, corpus, full_corpus):
+    token_lowercase = token.lower()
+
     if _case_insensitive_str_in_corpus(token, corpus):
         return True
 
@@ -116,14 +119,27 @@ def token_in_corpus(token, corpus, full_corpus):
 
     # check for "myfoo" where "foo" is in the corpus, as this is a
     # common/classic way of writing examples
-    # likewise, check for "newfoo", "oldfoo"
-    if token.lower().startswith("my") and _case_insensitive_str_in_corpus(
+    # likewise, check these similar cases:
+    # - "newfoo", "oldfoo"
+    # - "barobj", "bazstr", "foodir"
+    # - "barname", "foofile"
+    if token_lowercase.startswith("my") and _case_insensitive_str_in_corpus(
         token[2:], full_corpus
     ):
         return True
     if (
-        token.lower().startswith("new") or token.lower().startswith("old")
+        token_lowercase.startswith("new") or token_lowercase.startswith("old")
     ) and _case_insensitive_str_in_corpus(token[3:], full_corpus):
+        return True
+    if (
+        token_lowercase.endswith("obj")
+        or token_lowercase.endswith("str")
+        or token_lowercase.endswith("dir")
+    ) and _case_insensitive_str_in_corpus(token[:-3], full_corpus):
+        return True
+    if (
+        token_lowercase.endswith("name") or token_lowercase.endswith("file")
+    ) and _case_insensitive_str_in_corpus(token[:-4], full_corpus):
         return True
 
     # allow loose hyphenate and '_'-separation handling
@@ -175,14 +191,20 @@ def check_tokenstream(filename, tokenizer, context, lengthmap):
         location_item = (token, line.rstrip("\n"), pos, lineno)
 
         current_corpus = corpus_for_token(token, lengthmap)
-        if token_in_corpus(token, current_corpus, full_corpus):
-            continue
         if token in context.non_error_non_corpus_words:
+            continue
+        if token in context.cached_matches_in_corpus:
             continue
         if token in context.found_error_matches:
             if filename not in context.found_error_locations:
                 context.found_error_locations[filename] = []
             context.found_error_locations[filename].append(location_item)
+            continue
+
+        # token in corpus is the last check because it is the most expensive
+        # it will lowercase, split, title-ize, etc
+        if token_in_corpus(token, current_corpus, full_corpus):
+            context.cached_matches_in_corpus.add(token)
             continue
 
         if context.show_not_in_corpus:
